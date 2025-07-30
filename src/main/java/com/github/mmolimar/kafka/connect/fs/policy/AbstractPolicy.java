@@ -76,20 +76,37 @@ abstract class AbstractPolicy implements Policy {
     }
 
     private void configFs(Map<String, Object> customConfigs) throws IOException {
-        for (String uri : this.conf.getFsUris()) {
-            Configuration fsConfig = new Configuration();
-            fsConfig.set("fs.sftp.impl", "org.apache.hadoop.fs.sftp.SFTPFileSystem");
-            customConfigs.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(FsSourceTaskConfig.POLICY_PREFIX_FS))
-                    .forEach(entry -> fsConfig.set(entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
-                            (String) entry.getValue()));
+    for (String uri : this.conf.getFsUris()) {
+        Configuration fsConfig = new Configuration();
+        fsConfig.set("fs.sftp.impl", "org.apache.hadoop.fs.sftp.SFTPFileSystem");
+        customConfigs.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(FsSourceTaskConfig.POLICY_PREFIX_FS))
+                .forEach(entry -> fsConfig.set(entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
+                        (String) entry.getValue()));
 
-            Path workingDir = new Path(convert(uri));
-            FileSystem fs = FileSystem.newInstance(workingDir.toUri(), fsConfig);
-            fs.setWorkingDirectory(workingDir);
+        // Forcer l'authentification simple
+        fsConfig.set("hadoop.security.authentication", "simple");
+        UserGroupInformation.setConfiguration(fsConfig);
+
+        Path workingDir = new Path(convert(uri));
+
+        try {
+            UserGroupInformation ugi = UserGroupInformation.createRemoteUser("connect");
+
+            FileSystem fs = ugi.doAs((PrivilegedExceptionAction<FileSystem>) () -> {
+                FileSystem filesystem = FileSystem.get(workingDir.toUri(), fsConfig);
+                filesystem.setWorkingDirectory(workingDir);
+                return filesystem;
+            });
+
             this.fileSystems.add(fs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Interrupted while creating FileSystem instance", e);
         }
     }
+}
+
 
     private String convert(String uri) {
         String converted = uri;
