@@ -85,7 +85,7 @@ abstract class AbstractPolicy implements Policy {
                             (String) entry.getValue()));
 
             Path workingDir = new Path(convert(uri));
-            FileSystem fs = FileSystem.newInstance(workingDir.toUri(), fsConfig);
+            FileSystem fs = FileSystem.getLocal(fsConfig);
             fs.setWorkingDirectory(workingDir);
             this.fileSystems.add(fs);
         }
