@@ -16,7 +16,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -85,11 +84,8 @@ abstract class AbstractPolicy implements Policy {
                     .forEach(entry -> fsConfig.set(entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
                             (String) entry.getValue()));
 
-            // Forcer l'authentification simple
-            fsConfig.set("hadoop.security.authentication", "simple");
-            // Suppression de UserGroupInformation, création directe du FileSystem
             Path workingDir = new Path(convert(uri));
-            FileSystem fs = FileSystem.get(workingDir.toUri(), fsConfig);
+            FileSystem fs = FileSystem.newInstance(workingDir.toUri(), fsConfig);
             fs.setWorkingDirectory(workingDir);
             this.fileSystems.add(fs);
         }
