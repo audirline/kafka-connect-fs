@@ -14,9 +14,13 @@ jobs:
           java-version: 8
       - name: Build with Maven
         run: mvn clean package -DskipTests -B
+      - name: Copy build zip
+        run: |
+          mkdir -p /tmp/artifact
+          cp /home/runner/work/kafka-connect-fs/kafka-connect-fs/target/components/packages/*.zip /tmp/artifact
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: build-artifacts
-          path: target/
+          path: /tmp/artifact
     
