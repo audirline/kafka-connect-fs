@@ -1,0 +1,22 @@
+name: Build and code check
+'on':
+  push:
+jobs:
+  build-code-mvn:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 8
+      - name: Build with Maven
+        run: mvn clean install -B
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: build
+    
