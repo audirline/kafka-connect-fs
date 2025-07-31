@@ -76,20 +76,35 @@ abstract class AbstractPolicy implements Policy {
     }
 
     private void configFs(Map<String, Object> customConfigs) throws IOException {
-        for (String uri : this.conf.getFsUris()) {
-            Configuration fsConfig = new Configuration();
-            fsConfig.set("fs.sftp.impl", "org.apache.hadoop.fs.sftp.SFTPFileSystem");
-            customConfigs.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(FsSourceTaskConfig.POLICY_PREFIX_FS))
-                    .forEach(entry -> fsConfig.set(entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
-                            (String) entry.getValue()));
+    for (String uri : this.conf.getFsUris()) {
+        Configuration fsConfig = new Configuration();
 
-            Path workingDir = new Path(convert(uri));
-            FileSystem fs = FileSystem.getLocal(fsConfig);
-            fs.setWorkingDirectory(workingDir);
-            this.fileSystems.add(fs);
+        // Charger tous les paramètres Hadoop
+        customConfigs.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(FsSourceTaskConfig.POLICY_PREFIX_FS))
+                .forEach(entry -> fsConfig.set(
+                        entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
+                        String.valueOf(entry.getValue()))
+                );
+
+        // Lire le mode d'authentification Hadoop (par défaut = simple)
+        String authType = fsConfig.get("hadoop.security.authentication", "simple");
+        if ("kerberos".equalsIgnoreCase(authType)) {
+            // Juste logguer — on ne lance pas Kerberos dans Confluent Cloud
+            log.warn("{} Kerberos authentication declared but not supported in Confluent Cloud. Forcing simple mode.", this);
+            fsConfig.set("hadoop.security.authentication", "simple");
         }
+
+        Path workingDir = new Path(convert(uri));
+        URI uriObj = workingDir.toUri();
+
+        // Important : ne pas utiliser getLocal, sinon on reste en mode Unix => crash
+        FileSystem fs = FileSystem.newInstance(uriObj, fsConfig);
+        fs.setWorkingDirectory(workingDir);
+        this.fileSystems.add(fs);
     }
+}
+
 
     private String convert(String uri) {
         String converted = uri;
