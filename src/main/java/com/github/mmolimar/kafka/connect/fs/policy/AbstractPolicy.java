@@ -79,13 +79,17 @@ abstract class AbstractPolicy implements Policy {
         for (String uri : this.conf.getFsUris()) {
             Configuration fsConfig = new Configuration();
             fsConfig.set("fs.sftp.impl", "org.apache.hadoop.fs.sftp.SFTPFileSystem");
+            // Force disable Kerberos
+            fsConfig.set("hadoop.security.authentication", "simple");
+            fsConfig.set("hadoop.security.authorization", "false");
             customConfigs.entrySet().stream()
                     .filter(entry -> entry.getKey().startsWith(FsSourceTaskConfig.POLICY_PREFIX_FS))
                     .forEach(entry -> fsConfig.set(entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
                             (String) entry.getValue()));
 
             Path workingDir = new Path(convert(uri));
-            FileSystem fs = FileSystem.getLocal(fsConfig);
+            // Use get() instead of getLocal() for remote filesystems
+            FileSystem fs = FileSystem.get(workingDir.toUri(), fsConfig);
             fs.setWorkingDirectory(workingDir);
             this.fileSystems.add(fs);
         }
