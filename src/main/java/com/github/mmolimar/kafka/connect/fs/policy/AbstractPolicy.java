@@ -78,17 +78,22 @@ abstract class AbstractPolicy implements Policy {
     private void configFs(Map<String, Object> customConfigs) throws IOException {
         for (String uri : this.conf.getFsUris()) {
             Configuration fsConfig = new Configuration();
+
+            // Inject fs.conf.hadoop.* properties
+            this.conf.originals().entrySet().stream()
+                    .filter(entry -> entry.getKey().startsWith("fs.conf.hadoop."))
+                    .forEach(entry -> {
+                        String key = entry.getKey().substring("fs.conf.hadoop.".length());
+                        fsConfig.set(key, String.valueOf(entry.getValue()));
+                    });
+
             fsConfig.set("fs.sftp.impl", "org.apache.hadoop.fs.sftp.SFTPFileSystem");
-            // Force disable Kerberos
-            fsConfig.set("hadoop.security.authentication", "simple");
-            fsConfig.set("hadoop.security.authorization", "false");
-            customConfigs.entrySet().stream()
-                    .filter(entry -> entry.getKey().startsWith(FsSourceTaskConfig.POLICY_PREFIX_FS))
-                    .forEach(entry -> fsConfig.set(entry.getKey().replace(FsSourceTaskConfig.POLICY_PREFIX_FS, ""),
-                            (String) entry.getValue()));
+
+            if (!fsConfig.get("hadoop.security.authentication", "").equalsIgnoreCase("kerberos")) {
+                fsConfig.set("hadoop.security.authentication", "simple");
+            }
 
             Path workingDir = new Path(convert(uri));
-            // Use get() instead of getLocal() for remote filesystems
             FileSystem fs = FileSystem.get(workingDir.toUri(), fsConfig);
             fs.setWorkingDirectory(workingDir);
             this.fileSystems.add(fs);
@@ -152,11 +157,9 @@ abstract class AbstractPolicy implements Policy {
         interrupted = true;
     }
 
-    protected void preCheck() {
-    }
+    protected void preCheck() {}
 
-    protected void postCheck() {
-    }
+    protected void postCheck() {}
 
     public Iterator<FileMetadata> listFiles(FileSystem fs) throws IOException {
         return new Iterator<FileMetadata>() {
@@ -315,8 +318,7 @@ abstract class AbstractPolicy implements Policy {
             }
 
             @Override
-            public void seek(long offset) {
-            }
+            public void seek(long offset) {}
 
             @Override
             public long currentOffset() {
@@ -324,8 +326,7 @@ abstract class AbstractPolicy implements Policy {
             }
 
             @Override
-            public void close() {
-            }
+            public void close() {}
 
             @Override
             public boolean hasNext() {
